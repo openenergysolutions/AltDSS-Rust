@@ -1,7 +1,7 @@
 name: Build and test ARM64
 on:
   push:
-    branches: [main, feature/arm64]
+    branches: [main, multi-arch]
   pull_request:
     branches: [main]
 

@@ -1,7 +1,7 @@
 name: Cross-compile ARM64 (Alternative)
 on:
   push:
-    branches: [main, feature/arm64]
+    branches: [main, multi-arch]
   pull_request:
     branches: [main]
   workflow_dispatch:  # Allow manual triggering
