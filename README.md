@@ -19,12 +19,13 @@ This project is then expected to allow using both the official OpenDSS, within i
 
 # Current status
 
-- Initial testing done on x64 Linux, based on DSS C-API v**0.14.3**.
+- Testing done on x64 and ARM64 Linux, based on DSS C-API v**0.14.3**.
+- **NEW**: ARM64 support added! The project now automatically detects the target architecture and uses the appropriate DSS C-API binaries.
 - Exposes nearly all of the classic OpenDSS API and most of the classic API extensions in AltDSS/DSS C-API.
 - Organized in two main high-level structs: a `common::DSSContext` and `classic::IDSS`. `IDSS` mimics the COM organization, per [DSS-Python](https://dss-extensions.org/dss_python/dss/#module-dss.IDSS) (plus [DSS Sharp](https://dss-extensions.org/dss_sharp/html/6ec40528-724b-089f-8ac5-ce043f8f981f.htm) and DSS MATLAB) and the official implementation per https://opendss.epri.com/COMInterface.html
 - Future interfaces, exposed in other modules, will reuse the `DSSContext` struct.
 - Nearly all methods return a `Result<sometype, DSSError>` since DSS errors could be produced by nearly all DSS C-API functions. Future Rust versions could make this more comfortable.
-- Multi-threading confirmed to work fine on x64 Linux. Tests pending for other platforms.
+- Multi-threading confirmed to work fine on x64 and ARM64 Linux.
 
 Pending tasks and decisions:
 
@@ -48,10 +49,15 @@ Currently, this is not published to `crates.io` and there is no special handling
 
 This could change shortly, so remember to check later.
 
+## Supported Architectures
+
+AltDSS-Rust now supports both **x86_64** and **ARM64** architectures on Linux. The build system automatically detects your target architecture and downloads the appropriate DSS C-API binaries.
+
+## Quick Start Instructions
+
 Some direct instructions to get up and running (assuming Rust and tools are already installed):
 
-(NOTE: this needs to be updated, but the general idea still applies)
-
+### For x86_64 (Intel/AMD 64-bit):
 ```shell
 mkdir altdss-tests
 cd altdss-tests
@@ -64,6 +70,36 @@ cargo build
 cargo run --example ieee13
 cargo run --example list_props
 cargo run --example parallel
+```
+
+### For ARM64 (AArch64):
+```shell
+mkdir altdss-tests
+cd altdss-tests
+wget -qO- https://github.com/dss-extensions/dss_capi/releases/download/0.14.3/dss_capi_0.14.3_linux_arm64.tar.gz | tar zxv
+git clone --depth=1 https://github.com/dss-extensions/electricdss-tst
+git clone https://github.com/dss-extensions/altdss-rust
+export LD_LIBRARY_PATH=`pwd`/dss_capi/lib/linux_arm64
+cd altdss-rust
+cargo build
+cargo run --example ieee13
+cargo run --example list_props
+cargo run --example parallel
+```
+
+### Automated Build (any architecture):
+Alternatively, you can use the provided build scripts that automatically handle architecture detection:
+
+```shell
+git clone https://github.com/dss-extensions/altdss-rust
+cd altdss-rust
+./scripts/build_multiarch.sh  # Automatically detects your architecture
+```
+
+Or use architecture-specific scripts:
+```shell
+./scripts/build_linux_x64.sh     # Force x86_64 build (legacy)
+./scripts/build_linux_arm64.sh   # Force ARM64 build
 ```
 
 # Examples

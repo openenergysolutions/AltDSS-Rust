@@ -1,6 +1,44 @@
 {
-	"name": "AltDSS-Rust",
-	"image": "rust:1.74.0-bookworm",
+	"name": "AltDSS-Rust Multi-Arch",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"args": {
+			"RUST_VERSION": "1.86.0"
+		}
+	},
 	"runArgs": ["--network=host"],
-	"postCreateCommand": "bash ./scripts/build_linux_x64.sh"
+	"features": {
+		"ghcr.io/devcontainers/features/common-utils:2": {
+			"installZsh": true,
+			"configureZshAsDefaultShell": false,
+			"installOhMyZsh": true
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"rust-lang.rust-analyzer",
+				"serayuzgur.crates",
+				"vadimcn.vscode-lldb",
+				"ms-vscode.hexeditor",
+				"ms-vscode.makefile-tools"
+			],
+			"settings": {
+				"rust-analyzer.checkOnSave.command": "clippy",
+				"rust-analyzer.cargo.features": "all",
+				"rust-analyzer.cargo.target": null,
+				"terminal.integrated.defaultProfile.linux": "bash"
+			}
+		}
+	},
+	"postCreateCommand": "bash ./scripts/build_multiarch.sh",
+	"remoteUser": "root",
+	"mounts": [
+		"source=${localWorkspaceFolder}/.devcontainer/.bashrc,target=/root/.bashrc,type=bind,consistency=cached"
+	],
+	"containerEnv": {
+		"CARGO_TARGET_DIR": "/tmp/target",
+		"RUST_BACKTRACE": "1"
+	},
+	"forwardPorts": []
 }

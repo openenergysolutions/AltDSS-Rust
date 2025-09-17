@@ -1,0 +1,67 @@
+name: Cross-compile ARM64 (Alternative)
+on:
+  push:
+    branches: [main, feature/arm64]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  cross-compile-arm64:
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout AltDSS-Rust
+        uses: actions/checkout@v3
+        
+      - name: Install Rust and ARM64 cross-compilation tools
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source ~/.cargo/env
+          rustup target add aarch64-unknown-linux-gnu
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          
+      - name: Download ARM64 dss_capi binaries
+        run: |
+          echo "Downloading ARM64 dss_capi binaries..."
+          wget "https://github.com/dss-extensions/dss_capi/releases/download/0.14.3/dss_capi_0.14.3_linux_arm64.tar.gz"
+          tar -zxvf dss_capi_0.14.3_linux_arm64.tar.gz
+          
+          # Verify the ARM64 libraries
+          echo "Verifying downloaded libraries:"
+          file dss_capi/lib/linux_arm64/libdss_capi.so
+          ls -la dss_capi/lib/linux_arm64/
+          
+      - name: Configure cross-compilation environment
+        run: |
+          echo "Setting up cross-compilation environment..."
+          export CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc
+          export CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
+          export AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar
+          export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+          
+          # Set target architecture for build.rs
+          export CARGO_CFG_TARGET_ARCH=aarch64
+          
+          echo "Environment configured for ARM64 cross-compilation"
+          
+      - name: Cross-compile for ARM64
+        run: |
+          source ~/.cargo/env
+          export CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc
+          export CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
+          export AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar
+          export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+          export CARGO_CFG_TARGET_ARCH=aarch64
+          
+          echo "Starting ARM64 cross-compilation..."
+          cargo build --target aarch64-unknown-linux-gnu --verbose
+          
+          echo "Cross-compilation completed successfully!"
+          
+      - name: Verify ARM64 binary
+        run: |
+          echo "Verifying generated ARM64 binary:"
+          file target/aarch64-unknown-linux-gnu/debug/libaltdss.rlib
+          echo "ARM64 cross-compilation verification complete!"
