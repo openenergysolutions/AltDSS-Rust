@@ -21,7 +21,16 @@ use std::path::PathBuf;
 fn main() {
     let pwd_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let inc_path = Path::new(&*pwd_dir).join("./dss_capi/include");
-    let lib_path = Path::new(&*pwd_dir).join("./dss_capi/lib/linux_x64");
+
+    // Detect target architecture
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_else(|_| "x86_64".to_string());
+    let lib_subdir = match target_arch.as_str() {
+        "x86_64" => "linux_x64",
+        "aarch64" => "linux_arm64",
+        other => panic!("Unsupported architecture: {}", other),
+    };
+    let lib_path = Path::new(&*pwd_dir).join(format!("./dss_capi/lib/{}", lib_subdir));
+
     let profile = env::var("PROFILE").unwrap();
 
     println!("cargo:rustc-link-arg=-Wl,-rpath={}", lib_path.to_str().unwrap());
@@ -46,5 +55,5 @@ fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindings
         .write_to_file(out_path.join("bindings.rs"))
-        .expect("Couldn't write bindings!");    
+        .expect("Couldn't write bindings!");
 }
