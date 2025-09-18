@@ -31,7 +31,6 @@
 			}
 		}
 	},
-	"postCreateCommand": "bash ./scripts/build_multiarch.sh",
 	"remoteUser": "root",
 	"mounts": [
 		"source=${localWorkspaceFolder}/.devcontainer/.bashrc,target=/root/.bashrc,type=bind,consistency=cached"

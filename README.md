@@ -19,13 +19,14 @@ This project is then expected to allow using both the official OpenDSS, within i
 
 # Current status
 
-- Testing done on x64 and ARM64 Linux, based on DSS C-API v**0.14.3**.
-- **NEW**: ARM64 support added! The project now automatically detects the target architecture and uses the appropriate DSS C-API binaries.
+- Testing done on x64 and ARM64 Linux and macOS, based on DSS C-API v**0.14.3**.
+- **NEW**: Multi-platform support! Linux (x64/ARM64) and macOS (Intel/Apple Silicon) are fully supported.
+- **NEW**: Automatic dependency management! DSS C-API binaries are automatically downloaded during build - no manual setup required.
 - Exposes nearly all of the classic OpenDSS API and most of the classic API extensions in AltDSS/DSS C-API.
 - Organized in two main high-level structs: a `common::DSSContext` and `classic::IDSS`. `IDSS` mimics the COM organization, per [DSS-Python](https://dss-extensions.org/dss_python/dss/#module-dss.IDSS) (plus [DSS Sharp](https://dss-extensions.org/dss_sharp/html/6ec40528-724b-089f-8ac5-ce043f8f981f.htm) and DSS MATLAB) and the official implementation per https://opendss.epri.com/COMInterface.html
 - Future interfaces, exposed in other modules, will reuse the `DSSContext` struct.
 - Nearly all methods return a `Result<sometype, DSSError>` since DSS errors could be produced by nearly all DSS C-API functions. Future Rust versions could make this more comfortable.
-- Multi-threading confirmed to work fine on x64 and ARM64 Linux.
+- Multi-threading confirmed to work fine on all supported platforms.
 
 Pending tasks and decisions:
 
@@ -45,19 +46,89 @@ Pending tasks and decisions:
 
 # Getting started
 
-Currently, this is not published to `crates.io` and there is no special handling for the DSS C-API binaries.  
+## Using as a Dependency
 
-This could change shortly, so remember to check later.
+To use AltDSS-Rust in your own project, simply add it to your `Cargo.toml`:
 
-## Supported Architectures
+```toml
+[dependencies]
+altdss = { git = "https://github.com/dss-extensions/AltDSS-Rust" }
+```
 
-AltDSS-Rust now supports both **x86_64** and **ARM64** architectures on Linux. The build system automatically detects your target architecture and downloads the appropriate DSS C-API binaries.
+The DSS C-API binaries will be **automatically downloaded** during the build process based on your target architecture. No manual setup required!
+
+## Development Setup
+
+For developing AltDSS-Rust itself, you can use either the automated devcontainer setup or manual installation.
+
+## Supported Platforms
+
+AltDSS-Rust supports multiple architectures and operating systems:
+
+### Linux
+- **x86_64** (Intel/AMD 64-bit)
+- **ARM64** (AArch64) - including AWS Graviton, Raspberry Pi 4/5, etc.
+
+### macOS
+- **x86_64** (Intel Macs)
+- **ARM64** (Apple Silicon - M1, M2, M3, etc.)
+
+The build system automatically detects your platform and downloads the appropriate DSS C-API binaries.
 
 ## Quick Start Instructions
 
 Some direct instructions to get up and running (assuming Rust and tools are already installed):
 
-### For x86_64 (Intel/AMD 64-bit):
+### Automatic (Recommended - works on all platforms):
+```shell
+mkdir altdss-tests
+cd altdss-tests
+
+# Automatically detect platform and download the correct DSS C-API
+OS=$(uname -s)
+ARCH=$(uname -m)
+
+case "${OS}_${ARCH}" in
+    Linux_x86_64)
+        PLATFORM_SUFFIX="linux_x64"
+        ;;
+    Linux_aarch64)
+        PLATFORM_SUFFIX="linux_arm64"
+        ;;
+    Darwin_x86_64)
+        PLATFORM_SUFFIX="macos_x64"
+        ;;
+    Darwin_arm64)
+        PLATFORM_SUFFIX="macos_arm64"
+        ;;
+    *)
+        echo "Unsupported platform: ${OS} on ${ARCH}"
+        exit 1
+        ;;
+esac
+
+# Download appropriate DSS C-API
+wget -qO- https://github.com/dss-extensions/dss_capi/releases/download/0.14.3/dss_capi_0.14.3_${PLATFORM_SUFFIX}.tar.gz | tar zxv
+git clone --depth=1 https://github.com/dss-extensions/electricdss-tst
+git clone https://github.com/dss-extensions/altdss-rust
+
+# Set library path based on OS
+if [[ "$OS" == "Darwin" ]]; then
+    export DYLD_LIBRARY_PATH=`pwd`/dss_capi/lib/${PLATFORM_SUFFIX}
+else
+    export LD_LIBRARY_PATH=`pwd`/dss_capi/lib/${PLATFORM_SUFFIX}
+fi
+
+cd altdss-rust
+cargo build
+cargo run --example ieee13
+cargo run --example list_props
+cargo run --example parallel
+```
+
+### Platform-specific Examples:
+
+#### Linux x86_64 (Intel/AMD 64-bit):
 ```shell
 mkdir altdss-tests
 cd altdss-tests
@@ -72,7 +143,7 @@ cargo run --example list_props
 cargo run --example parallel
 ```
 
-### For ARM64 (AArch64):
+#### Linux ARM64 (AArch64):
 ```shell
 mkdir altdss-tests
 cd altdss-tests
@@ -87,19 +158,54 @@ cargo run --example list_props
 cargo run --example parallel
 ```
 
-### Automated Build (any architecture):
-Alternatively, you can use the provided build scripts that automatically handle architecture detection:
+#### macOS x86_64 (Intel Macs):
+```shell
+mkdir altdss-tests
+cd altdss-tests
+wget -qO- https://github.com/dss-extensions/dss_capi/releases/download/0.14.3/dss_capi_0.14.3_macos_x64.tar.gz | tar zxv
+git clone --depth=1 https://github.com/dss-extensions/electricdss-tst
+git clone https://github.com/dss-extensions/altdss-rust
+export DYLD_LIBRARY_PATH=`pwd`/dss_capi/lib/macos_x64
+cd altdss-rust
+cargo build
+cargo run --example ieee13
+cargo run --example list_props
+cargo run --example parallel
+```
+
+#### macOS ARM64 (Apple Silicon - M1, M2, M3):
+```shell
+mkdir altdss-tests
+cd altdss-tests
+wget -qO- https://github.com/dss-extensions/dss_capi/releases/download/0.14.3/dss_capi_0.14.3_macos_arm64.tar.gz | tar zxv
+git clone --depth=1 https://github.com/dss-extensions/electricdss-tst
+git clone https://github.com/dss-extensions/altdss-rust
+export DYLD_LIBRARY_PATH=`pwd`/dss_capi/lib/macos_arm64
+cd altdss-rust
+cargo build
+cargo run --example ieee13
+cargo run --example list_props
+cargo run --example parallel
+```
+
+### Automated Build Scripts:
+Alternatively, you can use the provided build scripts that automatically handle platform detection:
 
 ```shell
 git clone https://github.com/dss-extensions/altdss-rust
 cd altdss-rust
-./scripts/build_multiarch.sh  # Automatically detects your architecture
+./scripts/build_multiarch.sh  # Automatically detects your platform
 ```
 
-Or use architecture-specific scripts:
+Or use platform-specific scripts:
 ```shell
-./scripts/build_linux_x64.sh     # Force x86_64 build (legacy)
-./scripts/build_linux_arm64.sh   # Force ARM64 build
+# Linux
+./scripts/build_linux_x64.sh     # Force Linux x86_64 build
+./scripts/build_linux_arm64.sh   # Force Linux ARM64 build
+
+# macOS  
+./scripts/build_macos_x64.sh     # Force macOS Intel build
+./scripts/build_macos_arm64.sh   # Force macOS Apple Silicon build
 ```
 
 # Examples

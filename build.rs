@@ -17,23 +17,109 @@
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
+use std::fs;
+use std::io;
+use flate2::read::GzDecoder;
+use tar::Archive;
+
+fn download_dss_capi(version: &str, platform: &str, target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let url = format!(
+        "https://github.com/dss-extensions/dss_capi/releases/download/{}/dss_capi_{}_{}
+
+.tar.gz",
+        version, version, platform
+    );
+    
+    println!("cargo:warning=Downloading DSS C-API {} for {}...", version, platform);
+    println!("cargo:warning=URL: {}", url);
+    
+    // Download the archive
+    let response = ureq::get(&url).call()?;
+    
+    // Create a buffer to read the response
+    let mut reader = response.into_reader();
+    let mut buffer = Vec::new();
+    io::copy(&mut reader, &mut buffer)?;
+    
+    // Decompress and extract
+    let decoder = GzDecoder::new(&buffer[..]);
+    let mut archive = Archive::new(decoder);
+    
+    // Extract to the target directory
+    archive.unpack(target_dir)?;
+    
+    println!("cargo:warning=DSS C-API {} extracted successfully", version);
+    Ok(())
+}
+
+fn ensure_dss_capi(version: &str, platform: &str, manifest_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let dss_capi_dir = manifest_dir.join("dss_capi");
+    let lib_dir = dss_capi_dir.join("lib").join(platform);
+    let include_dir = dss_capi_dir.join("include");
+    
+    // Check if DSS C-API is already available
+    if lib_dir.exists() && include_dir.exists() {
+        println!("cargo:warning=DSS C-API {} for {} already available", version, platform);
+        return Ok(());
+    }
+    
+    // Create the target directory if it doesn't exist
+    fs::create_dir_all(manifest_dir)?;
+    
+    // Download and extract DSS C-API
+    download_dss_capi(version, platform, manifest_dir)?;
+    
+    // Verify extraction was successful
+    if !lib_dir.exists() || !include_dir.exists() {
+        return Err(format!(
+            "DSS C-API extraction failed. Missing directories: lib/{} or include", 
+            platform
+        ).into());
+    }
+    
+    Ok(())
+}
 
 fn main() {
     let pwd_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let inc_path = Path::new(&*pwd_dir).join("./dss_capi/include");
-
-    // Detect target architecture
+    let manifest_path = Path::new(&*pwd_dir);
+    
+    // Get version from Cargo.toml
+    let version = env::var("CARGO_PKG_VERSION").unwrap();
+    
+    // Detect target architecture and OS
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_else(|_| "x86_64".to_string());
-    let lib_subdir = match target_arch.as_str() {
-        "x86_64" => "linux_x64",
-        "aarch64" => "linux_arm64",
-        other => panic!("Unsupported architecture: {}", other),
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_else(|_| "linux".to_string());
+    
+    let lib_subdir = match (target_os.as_str(), target_arch.as_str()) {
+        ("linux", "x86_64") => "linux_x64",
+        ("linux", "aarch64") => "linux_arm64",
+        ("macos", "aarch64") => "macos_arm64",
+        ("macos", "x86_64") => "macos_x64",
+        (os, arch) => panic!("Unsupported platform: {} on {}", arch, os),
     };
-    let lib_path = Path::new(&*pwd_dir).join(format!("./dss_capi/lib/{}", lib_subdir));
+    
+    // Ensure DSS C-API is available
+    if let Err(e) = ensure_dss_capi(&version, lib_subdir, manifest_path) {
+        panic!("Failed to ensure DSS C-API availability: {}", e);
+    }
+    
+    let inc_path = manifest_path.join("./dss_capi/include");
+    let lib_path = manifest_path.join(format!("./dss_capi/lib/{}", lib_subdir));
 
     let profile = env::var("PROFILE").unwrap();
 
-    println!("cargo:rustc-link-arg=-Wl,-rpath={}", lib_path.to_str().unwrap());
+    // Configure linker based on target OS
+    match target_os.as_str() {
+        "linux" => {
+            println!("cargo:rustc-link-arg=-Wl,-rpath={}", lib_path.to_str().unwrap());
+        }
+        "macos" => {
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_path.to_str().unwrap());
+        }
+        _ => {}
+    }
+    
     // Select the library binary according to the build profile
     match profile.as_str() {
         "debug" => println!("cargo:rustc-link-lib=dylib=dss_capid"),

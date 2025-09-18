@@ -5,12 +5,14 @@
 ########################
 function detect_architecture() {
     local arch=""
+    local os=""
     
-    # Check if CARGO_CFG_TARGET_ARCH is set (for cross-compilation)
-    if [[ -n "${CARGO_CFG_TARGET_ARCH}" ]]; then
+    # Check if CARGO_CFG_TARGET_ARCH and CARGO_CFG_TARGET_OS are set (for cross-compilation)
+    if [[ -n "${CARGO_CFG_TARGET_ARCH}" && -n "${CARGO_CFG_TARGET_OS}" ]]; then
         arch="${CARGO_CFG_TARGET_ARCH}"
+        os="${CARGO_CFG_TARGET_OS}"
     else
-        # Fall back to system architecture
+        # Fall back to system detection
         case "$(uname -m)" in
             x86_64)
                 arch="x86_64"
@@ -23,17 +25,36 @@ function detect_architecture() {
                 exit 1
                 ;;
         esac
+        
+        case "$(uname -s)" in
+            Linux)
+                os="linux"
+                ;;
+            Darwin)
+                os="macos"
+                ;;
+            *)
+                echo "Error: Unsupported OS $(uname -s)"
+                exit 1
+                ;;
+        esac
     fi
     
-    case "${arch}" in
-        x86_64)
+    case "${os}_${arch}" in
+        linux_x86_64)
             echo "linux_x64"
             ;;
-        aarch64)
+        linux_aarch64)
             echo "linux_arm64"
             ;;
+        macos_x86_64)
+            echo "macos_x64"
+            ;;
+        macos_aarch64)
+            echo "macos_arm64"
+            ;;
         *)
-            echo "Error: Unsupported target architecture: ${arch}"
+            echo "Error: Unsupported platform: ${arch} on ${os}"
             exit 1
             ;;
     esac
@@ -44,19 +65,40 @@ function detect_architecture() {
 # dependencies
 ########################
 function install_dependencies() {
-    apt-get update && apt-get install -y \
-        lldb \
-        build-essential \
-        clang \
-        libclang-dev \
-        cmake \
-        libprotobuf-dev \
-        protobuf-compiler \
-        libsuitesparse-dev \
-        libeigen3-dev \
-        curl \
-        git \
-        jq
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        # macOS dependencies using Homebrew
+        if ! command -v brew &> /dev/null; then
+            echo "Error: Homebrew is required on macOS. Please install it first."
+            echo "Visit: https://brew.sh"
+            exit 1
+        fi
+        
+        echo "Installing macOS dependencies..."
+        brew install \
+            llvm \
+            cmake \
+            protobuf \
+            suite-sparse \
+            eigen \
+            curl \
+            git \
+            jq
+    else
+        # Linux dependencies using apt
+        apt-get update && apt-get install -y \
+            lldb \
+            build-essential \
+            clang \
+            libclang-dev \
+            cmake \
+            libprotobuf-dev \
+            protobuf-compiler \
+            libsuitesparse-dev \
+            libeigen3-dev \
+            curl \
+            git \
+            jq
+    fi
 }
 
 ########################
